@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WinAdam OS World</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <h1 onclick="location.hash=''">WinAdam <span>OS World</span></h1>
+</header>
+
+<!-- HOME -->
+<div id="home" class="layout">
+  <main id="postList"></main>
+  <aside>
+    <div class="widget">
+      <h3>Recent Posts</h3>
+      <ul id="recentPosts"></ul>
+    </div>
+    <div class="widget">
+      <h3>Search</h3>
+      <div class="search-box">
+        <input id="searchInput" placeholder="Search builds..." oninput="renderHome()">
+      </div>
+    </div>
+    <div class="widget">
+      <h3>Contact</h3>
+      <div class="contact-box">
+        Questions?<br>
+        <a href="mailto:winadamosworld@protonmail.com">winadamosworld@protonmail.com</a>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- DETAIL -->
+<div id="detail" class="detail-wrap" style="display:none;">
+  <button class="back-btn" onclick="showHome()">← Back to Home</button>
+  <div id="detailContent"></div>
+</div>
+
+<script>
+let POSTS = [];
+
+async function loadPosts() {
+  try {
+    const res = await fetch('posts.json');
+    const data = await res.json();
+    POSTS = data.posts || [];
+  } catch (e) {
+    POSTS = [];
+  }
+  renderHome();
+  route();
+}
+
+function renderHome() {
+  const q = (document.getElementById('searchInput')?.value || '').toLowerCase();
+  const filtered = POSTS.filter(p => !q || p.title.toLowerCase().includes(q));
+
+  document.getElementById('postList').innerHTML = filtered.map(p => `
+    <div class="post-card" onclick="openPost(${p.id})">
+      ${p.cover ? `<img class="post-cover" src="${esc(p.cover)}" alt="">` : ''}
+      <div class="post-inner">
+        <h2>${esc(p.title)}</h2>
+        <div class="excerpt">${esc((p.intro || '').replace(/\n/g,' '))}</div>
+        <span class="read-more">Continue reading →</span>
+      </div>
+    </div>
+  `).join('') || '<p class="muted">No builds yet.</p>';
+
+  document.getElementById('recentPosts').innerHTML = POSTS.slice(0,8).map(p => `
+    <li><a href="#post-${p.id}">${esc(p.title)}</a>
+      <span class="date">${esc(p.date)}</span></li>
+  `).join('') || '<li class="muted">No posts.</li>';
+}
+
+function openPost(id) {
+  location.hash = 'post-' + id;
+  route();
+}
+
+function route() {
+  const m = location.hash.match(/^#post-(\d+)/);
+  if (m) {
+    const p = POSTS.find(x => x.id === Number(m[1]));
+    if (p) return showDetail(p);
+  }
+  showHome();
+}
+
+function showHome() {
+  document.getElementById('home').style.display = '';
+  document.getElementById('detail').style.display = 'none';
+}
+
+function showDetail(p) {
+  document.getElementById('home').style.display = 'none';
+  document.getElementById('detail').style.display = '';
+  window.scrollTo(0,0);
+
+  const comments = JSON.parse(localStorage.getItem('comments_' + p.id) || '[]');
+
+  const info = p.info || {};
+  const infoRows = Object.entries(info)
+    .filter(([k,v]) => v)
+    .map(([k,v]) => `<div class="k">${esc(k)}</div><div>${esc(v)}</div>`)
+    .join('');
+
+  const removed = (p.removed || []).filter(Boolean);
+  const download = p.download && p.download !== 'not yet'
+    ? `<a class="download-btn" href="${esc(p.download)}" target="_blank" rel="noopener">⬇ Download</a>`
+    : '';
+  const paypal = p.paypal && p.paypal !== 'not yet'
+    ? `<div><a class="paypal-btn" href="${esc(p.paypal)}" target="_blank" rel="noopener">💛 Support with PayPal</a></div>`
+    : '';
+
+  document.getElementById('detailContent').innerHTML = `
+    <div class="detail-card">
+      <h1>${esc(p.title)}</h1>
+      <div class="meta">${esc(p.date)}</div>
+      ${p.cover && p.cover !== 'no' ? `<img class="cover" src="${esc(p.cover)}" alt="">` : ''}
+      ${(p.intro || '').split('\n').map(l => `<p>${esc(l)}</p>`).join('')}
+
+      ${removed.length ? `
+        <h3>Removed:</h3>
+        <ul>${removed.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
+      ` : ''}
+
+      ${infoRows ? `<div class="info-grid">${infoRows}</div>` : ''}
+
+      ${download}
+      ${paypal}
+
+      <div class="comments">
+        <h3>${comments.length} Comments</h3>
+        <div>
+          ${comments.map(c => `
+            <div class="comment">
+              <span class="who">${esc(c.who)}</span>
+              <span class="when">${esc(c.when)}</span>
+              <div>${esc(c.text)}</div>
+            </div>
+          `).join('') || '<div class="muted">No comments yet.</div>'}
+        </div>
+        <div class="comment-form">
+          <input id="cName" placeholder="Your name" style="max-width:140px">
+          <input id="cText" placeholder="Write a comment..."
+                 onkeydown="if(event.key==='Enter')addComment(${p.id})">
+          <button onclick="addComment(${p.id})">Send</button>
+        </div>
+        <p class="muted" style="font-size:12px;margin-top:8px">
+          Comments are stored locally in your browser only.
+        </p>
+      </div>
+    </div>
+  `;
+}
+
+function addComment(id) {
+  const who = (document.getElementById('cName').value || '').trim() || 'Anonymous';
+  const text = (document.getElementById('cText').value || '').trim();
+  if (!text) return;
+  const list = JSON.parse(localStorage.getItem('comments_' + id) || '[]');
+  list.push({ who, text, when: new Date().toLocaleString('en-US') });
+  localStorage.setItem('comments_' + id, JSON.stringify(list));
+  route();
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+window.addEventListener('hashchange', route);
+loadPosts();
+</script>
+</body>
+</html>

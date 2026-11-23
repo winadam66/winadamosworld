@@ -1,1 +1,20 @@
-
+{
+  "posts": [
+    {
+      "id": 1,
+      "title": "First post of nothing",
+      "date": "2026-11-23",
+      "cover": "thestart.png",
+      "intro": "I just wanted to share my builds, because I wanna see if people love it.\n\nMy YouTube Channel: https://youtube.com/@WinAdam\n\n\nBuilds are soonly coming!!",
+      "removed": [],
+      "info": {
+        "System": "",
+        "Language": "",
+        "Compression": "",
+        "Size": ""
+      },
+      "download": "",
+      "paypal": ""
+    }
+  ]
+}
